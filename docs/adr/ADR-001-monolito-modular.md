@@ -21,21 +21,23 @@ O Core atual já é, estruturalmente, um Monólito em Camadas: um único deploy,
 
 Do conjunto sugerido pelo desafio (manutenibilidade, desempenho, escalabilidade, testabilidade, complexidade operacional), os cinco foram considerados antes de selecionar os que realmente decidem entre as alternativas.
 
-## ASRs selecionados (máximo 3)
+## RNFs e seleção dos ASRs (máximo 3)
 
-| ASR                      | Por que se torna um ASR neste cenário                                                                                                                                                                  |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Escalabilidade           | Se o ranking precisa suportar carga muito maior que o resto, a estrutura precisa permitir escalar só essa capacidade, não o sistema inteiro                                                            |
-| Complexidade operacional | Cada processo, banco ou pipeline adicional é custo recorrente que uma equipe pequena (3 a 6 devs) precisa absorver; é o contrapeso que evita decompor por impulso                                      |
-| Manutenibilidade         | O case prevê evolução contínua do produto, e cursos, conquistas e recompensas seguem evoluindo junto com o ranking; sem fronteira interna entre módulos de negócio, a evolução de um arrisca os outros |
+Nem todo RNF é automaticamente um ASR. Foram selecionados somente os atributos capazes de influenciar estrutura, implantação ou operação do Core.
 
-Desempenho ficou fora dos 3 prioritários por ser, neste contexto, consequência direta de escalabilidade: o problema não é "processar devagar", é "uma parte específica recebe carga muito maior que o resto". Testabilidade ficou fora porque, nesta decisão, o que está em jogo é a forma macro do Core (manter, modularizar ou decompor), não a forma como cada parte é testada internamente.
+| RNF                      | ASR?                  | Justificativa arquitetural                                                                                                                                                                             |
+| ------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Manutenibilidade         | SIM                   | O case prevê evolução contínua do produto, e cursos, conquistas e recompensas seguem evoluindo junto com o ranking; sem fronteira interna entre módulos de negócio, a evolução de um arrisca os outros |
+| Escalabilidade           | SIM                   | Se o ranking precisa suportar carga muito maior que o resto, a estrutura precisa permitir escalar só essa capacidade, não o sistema inteiro                                                            |
+| Complexidade operacional | SIM                   | Cada processo, banco ou pipeline adicional é custo recorrente que uma equipe pequena (3 a 6 devs) precisa absorver; é o contrapeso que evita decompor por impulso                                      |
+| Desempenho               | NÃO, neste momento    | É consequência direta de escalabilidade: o problema não é "processar devagar", é "uma parte específica recebe carga muito maior que o resto"; não há medição de latência/throughput que prove gargalo  |
+| Testabilidade            | NÃO como driver macro | O que está em jogo nesta decisão é a forma macro do Core (manter, modularizar ou decompor), não a forma como cada parte é testada internamente                                                         |
 
 ## RPCs - restrições e premissas
 
 - Core permanece Java/Spring Boot (não é uma opção em aberto)
 - Equipe pequena: 6 desenvolvedores no cenário do exercício, 3 na equipe real
-- Banco relacional e legado da AC1 (PostgreSQL em produção/Docker, H2 em dev/teste)
+- Banco relacional e legado da AC1 (PostgreSQL em produção/Docker, H2 em dev/teste); a US1 já está implementada e testada, então a solução deve evoluir incrementalmente, sem reescrever o que já funciona
 - Não existe legado de ranking a migrar, é funcionalidade nova
 
 ## Alternativas consideradas
@@ -48,7 +50,7 @@ Desempenho ficou fora dos 3 prioritários por ser, neste contexto, consequência
 
 ## Decisão
 
-Evoluir o Core para **Monólito Modular (B)**: reorganizar o código por módulo de negócio (cursos, ranking, recompensas), cada um com fronteira interna clara, dentro do mesmo processo e do mesmo deploy.
+Evoluir o Core para **Monólito Modular (B)**: reorganizar o código por módulo de negócio (cursos, ranking, conquistas, recompensas), cada um com fronteira interna clara, dentro do mesmo processo e do mesmo deploy.
 
 Não (A), porque manter a organização puramente técnica atual mistura cursos e o futuro ranking no mesmo namespace, sem nenhuma fronteira que proteja um módulo de mudanças no outro. Não (C) ainda, porque não há ASR comprovado por métrica real que justifique pagar o custo operacional de um serviço separado com uma equipe deste tamanho, que nunca operou nada distribuído.
 
@@ -58,6 +60,10 @@ Não (A), porque manter a organização puramente técnica atual mistura cursos 
 - Prepara extração futura de baixo custo: se o ranking precisar mesmo escalar sozinho, extrair um módulo já isolado é muito mais barato que desembaraçar um monólito em camadas.
 - Não resolve, por si só, uma assimetria de carga extrema. Se isso se confirmar com métrica real de produção, a decomposição seletiva do ranking (C) passa a ser o próximo passo natural, não um recomeço.
 - Trade-off aceito conscientemente: abrimos mão do ganho imediato de escalabilidade independente (que só (C) daria) em troca de menor complexidade operacional e menor risco para uma equipe pequena.
+
+## Gatilho de revisão
+
+Reavaliar a extração do módulo de ranking para um serviço independente (alternativa C) quando houver métrica real de produção mostrando gargalo, necessidade de escala própria ou frequência de deploy que justifique o custo operacional adicional. Até lá, a decisão permanece Monólito Modular.
 
 ## C4 Container
 

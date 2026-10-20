@@ -41,7 +41,7 @@ Nota importante sobre o estado real do projeto: o case descreve um cenário com 
 
 **Cenário:** o MVP cresce de 1.000 para até 100.000 usuários; o ranking cresce mais que as demais funcionalidades.
 
-**Decisão:** evoluir o Core de Monólito em Camadas para **Monólito Modular**, organizando o código por módulo de negócio (cursos, ranking, recompensas) dentro do mesmo deploy, em vez de manter a organização puramente técnica atual ou decompor em serviços já nesta rodada.
+**Decisão:** evoluir o Core de Monólito em Camadas para **Monólito Modular**, organizando o código por módulo de negócio (cursos, ranking, conquistas, recompensas) dentro do mesmo deploy, em vez de manter a organização puramente técnica atual ou decompor em serviços já nesta rodada.
 
 **Por quê, resumido:** não há ainda ASR comprovado por métrica real que justifique o custo operacional de um serviço separado (alternativa C), e manter a organização técnica atual (alternativa A) deixa ranking e cursos acoplados no mesmo namespace, sem nenhuma fronteira que proteja um módulo de mudanças no outro. O Monólito Modular resolve a manutenibilidade agora e deixa a extração futura barata, se a carga do ranking se confirmar na prática.
 
