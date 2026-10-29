@@ -1,5 +1,7 @@
 package com.example.grupo_5_gameeducation.service;
 
+import com.example.grupo_5_gameeducation.domain.Aluno;
+import com.example.grupo_5_gameeducation.domain.Curso;
 import com.example.grupo_5_gameeducation.dto.AlunoResponse;
 import com.example.grupo_5_gameeducation.dto.ConcluirCursoRequest;
 import com.example.grupo_5_gameeducation.dto.CriarAlunoRequest;
@@ -32,7 +34,9 @@ public class AlunoService {
 
     public AlunoResponse concluirCurso(Long id, ConcluirCursoRequest request) {
         AlunoEntity entity = buscarEntidade(id);
-        entity.concluirCurso(request.tituloCurso(), request.media());
+        Aluno aluno = entity.paraDominio();
+        aluno.concluir(new Curso(request.tituloCurso()), request.media());
+        entity.atualizarEstado(aluno);
         return AlunoResponse.from(alunoRepository.save(entity));
     }
 

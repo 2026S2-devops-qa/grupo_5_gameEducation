@@ -2,6 +2,7 @@ package com.example.grupo_5_gameeducation.domain;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -13,6 +14,10 @@ import org.junit.jupiter.api.Test;
  * RED, antes da implementacao, e nao foi alterado depois. Quem evolui ao longo do ciclo
  * TDD e o Aluno.java, onde as etapas RED, GREEN e BLUE de cada cenario estao registradas.
  * O que muda em cada teste e so o resultado da execucao, anotado no javadoc do metodo.
+ *
+ * Um quarto teste, fora dos 3 cenarios de BDD, cobre o construtor de reconstrucao e o
+ * getter de cursosConcluidos. Essa capacidade existe para que a camada de persistencia
+ * (AlunoEntity/AlunoService) reaproveite esta mesma regra, em vez de reimplementa-la.
  */
 class AlunoTest {
 
@@ -114,5 +119,24 @@ class AlunoTest {
         // ASSERT
         assertEquals(3, aluno.getCursosLiberados());
         assertEquals(1, aluno.getCursosConquistados());
+    }
+
+    @Test
+    @DisplayName("Reconstroi aluno com estado existente e preserva a guarda contra repeticao")
+    void deveReconstruirAlunoComEstadoExistenteEPreservarGuardaDeRepeticao() {
+        Aluno aluno = new Aluno(
+                "Bruno da Silveira Escanhoela",
+                Plano.BASICO,
+                Set.of("Fundamentos de Agile Testing"),
+                3);
+        Curso mesmoCurso = new Curso("Fundamentos de Agile Testing");
+
+        // ACTION
+        aluno.concluir(mesmoCurso, 9.0);
+
+        // ASSERT
+        assertEquals(3, aluno.getCursosLiberados());
+        assertEquals(1, aluno.getCursosConquistados());
+        assertEquals(Set.of("Fundamentos de Agile Testing"), aluno.getCursosConcluidos());
     }
 }

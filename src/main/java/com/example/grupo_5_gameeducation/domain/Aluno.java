@@ -1,5 +1,6 @@
 package com.example.grupo_5_gameeducation.domain;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -278,12 +279,19 @@ public class Aluno {
 
     private final String nome;
     private final Plano plano;
-    private final Set<String> cursosConcluidos = new HashSet<>();
+    private Set<String> cursosConcluidos = new HashSet<>();
     private int cursosLiberados;
 
     public Aluno(String nome, Plano plano) {
         this.nome = nome;
         this.plano = plano;
+    }
+
+    public Aluno(String nome, Plano plano, Set<String> cursosConcluidos, int cursosLiberados) {
+        this.nome = nome;
+        this.plano = plano;
+        this.cursosConcluidos = new HashSet<>(cursosConcluidos);
+        this.cursosLiberados = cursosLiberados;
     }
 
     public void concluir(Curso curso, double media) {
@@ -306,5 +314,9 @@ public class Aluno {
 
     public int getCursosConquistados() {
         return cursosConcluidos.size();
+    }
+
+    public Set<String> getCursosConcluidos() {
+        return Collections.unmodifiableSet(cursosConcluidos);
     }
 }

@@ -1,5 +1,6 @@
 package com.example.grupo_5_gameeducation.entity;
 
+import com.example.grupo_5_gameeducation.domain.Aluno;
 import com.example.grupo_5_gameeducation.domain.Plano;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -18,9 +19,6 @@ import java.util.Set;
 @Entity
 @Table(name = "aluno")
 public class AlunoEntity {
-
-    private static final double MEDIA_MINIMA_APROVACAO = 7.0;
-    private static final int CURSOS_LIBERADOS_POR_APROVACAO = 3;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -47,15 +45,14 @@ public class AlunoEntity {
         this.nome = nome;
         this.plano = plano;
     }
+    
+    public Aluno paraDominio() {
+        return new Aluno(nome, plano, cursosConcluidos, cursosLiberados);
+    }
 
-    public void concluirCurso(String tituloCurso, double media) {
-        boolean primeiraConclusao = cursosConcluidos.add(tituloCurso);
-        if (!primeiraConclusao) {
-            return;
-        }
-        if (media > MEDIA_MINIMA_APROVACAO) {
-            cursosLiberados += CURSOS_LIBERADOS_POR_APROVACAO;
-        }
+    public void atualizarEstado(Aluno aluno) {
+        this.cursosConcluidos = new HashSet<>(aluno.getCursosConcluidos());
+        this.cursosLiberados = aluno.getCursosLiberados();
     }
 
     public Long getId() {
