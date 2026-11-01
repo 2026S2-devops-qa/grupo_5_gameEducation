@@ -1,7 +1,7 @@
-package com.example.grupo_5_gameeducation.dto;
+package com.example.grupo_5_gameeducation.cursos.api;
 
+import com.example.grupo_5_gameeducation.cursos.internal.AlunoEntity;
 import com.example.grupo_5_gameeducation.domain.Plano;
-import com.example.grupo_5_gameeducation.entity.AlunoEntity;
 
 public record AlunoResponse(
         Long id,

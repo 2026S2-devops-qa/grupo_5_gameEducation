@@ -1,12 +1,10 @@
-package com.example.grupo_5_gameeducation.service;
+package com.example.grupo_5_gameeducation.cursos.internal;
 
+import com.example.grupo_5_gameeducation.cursos.api.AlunoResponse;
+import com.example.grupo_5_gameeducation.cursos.api.ConcluirCursoRequest;
+import com.example.grupo_5_gameeducation.cursos.api.CriarAlunoRequest;
 import com.example.grupo_5_gameeducation.domain.Aluno;
 import com.example.grupo_5_gameeducation.domain.Curso;
-import com.example.grupo_5_gameeducation.dto.AlunoResponse;
-import com.example.grupo_5_gameeducation.dto.ConcluirCursoRequest;
-import com.example.grupo_5_gameeducation.dto.CriarAlunoRequest;
-import com.example.grupo_5_gameeducation.entity.AlunoEntity;
-import com.example.grupo_5_gameeducation.repository.AlunoRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 

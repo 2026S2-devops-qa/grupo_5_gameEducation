@@ -1,4 +1,4 @@
-package com.example.grupo_5_gameeducation.dto;
+package com.example.grupo_5_gameeducation.cursos.api;
 
 import com.example.grupo_5_gameeducation.domain.Plano;
 

@@ -67,7 +67,21 @@ Reavaliar a extração do módulo de ranking para um serviço independente (alte
 
 ## C4 Container
 
-Pendente.
+No Desafio 1 a decisão é macro: o Core continua sendo um único container, e o que muda é a organização interna dele, que passa a ser modular. O detalhamento dos componentes internos (fronteiras exatas entre os módulos) fica para quando a equipe decidir aprofundar a organização interna do Core.
+
+```mermaid
+graph TD
+    Usuario["Aluno<br/>(usuário da plataforma)"]
+    Frontend["Front-end Web<br/>Vue 3<br/>Interface da plataforma"]
+    Core["Core Gamificação<br/>Java / Spring Boot<br/>Monólito Modular<br/>Cursos | Ranking | Conquistas | Recompensas"]
+    DB["Banco Relacional<br/>PostgreSQL / H2"]
+
+    Usuario -->|usa| Frontend
+    Frontend -->|REST / JSON| Core
+    Core -->|JPA| DB
+```
+
+Estado real hoje: só o módulo **Cursos** existe em código (US1, implementado e testado). Ranking, Conquistas e Recompensas são os módulos previstos pela decisão, ainda não construídos. O C4 representa a arquitetura resultante da decisão (para onde os próximos módulos devem nascer), não um estado totalmente implementado.
 
 ## Evidência / mini-lab
 

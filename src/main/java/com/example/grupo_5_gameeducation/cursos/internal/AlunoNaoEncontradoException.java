@@ -1,4 +1,4 @@
-package com.example.grupo_5_gameeducation.service;
+package com.example.grupo_5_gameeducation.cursos.internal;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;

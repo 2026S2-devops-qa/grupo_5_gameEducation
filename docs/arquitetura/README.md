@@ -20,21 +20,21 @@ Nota importante sobre o estado real do projeto: o case descreve um cenário com 
 
 ## Status dos desafios
 
-| #   | Desafio                     | Status                                       | ADR                                           |
-| --- | --------------------------- | -------------------------------------------- | --------------------------------------------- |
-| 1   | Drivers e Evolução do Core  | Decisão registrada, C4 e evidência pendentes | [ADR-001](../adr/ADR-001-monolito-modular.md) |
-| 2   | Organização Interna do Core | a fazer                                      | -                                             |
-| 3   | Serviço Python e IA         | a fazer                                      | -                                             |
-| 4   | Comunicação e Eventos       | a fazer                                      | -                                             |
-| 5   | IoT e MQTT                  | a fazer                                      | -                                             |
-| 6   | CI/CD e Observabilidade     | a fazer                                      | -                                             |
+| #   | Desafio                     | Status    | ADR                                           |
+| --- | --------------------------- | --------- | --------------------------------------------- |
+| 1   | Drivers e Evolução do Core  | Concluído | [ADR-001](../adr/ADR-001-monolito-modular.md) |
+| 2   | Organização Interna do Core | a fazer   | -                                             |
+| 3   | Serviço Python e IA         | a fazer   | -                                             |
+| 4   | Comunicação e Eventos       | a fazer   | -                                             |
+| 5   | IoT e MQTT                  | a fazer   | -                                             |
+| 6   | CI/CD e Observabilidade     | a fazer   | -                                             |
 
 ## Matriz cumulativa de ASRs
 
-| Desafio | ASR                      | Por que virou ASR                                                                                    | Decisão resultante                                                                              |
-| ------- | ------------------------ | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| 1       | Escalabilidade           | Ranking projetado para crescer desproporcionalmente em relação às demais funcionalidades             | Monólito Modular, isolando o módulo de ranking para uma extração futura de baixo custo          |
-| 1       | Complexidade operacional | Equipe pequena (3 a 6 devs), sem experiência prévia em sistemas distribuídos                         | Mesma decisão: evita o custo de deploy e observabilidade distribuída sem necessidade comprovada |
+| Desafio | ASR                      | Por que virou ASR                                                                                                                                      | Decisão resultante                                                                              |
+| ------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| 1       | Escalabilidade           | Ranking projetado para crescer desproporcionalmente em relação às demais funcionalidades                                                               | Monólito Modular, isolando o módulo de ranking para uma extração futura de baixo custo          |
+| 1       | Complexidade operacional | Equipe pequena (3 a 6 devs), sem experiência prévia em sistemas distribuídos                                                                           | Mesma decisão: evita o custo de deploy e observabilidade distribuída sem necessidade comprovada |
 | 1       | Manutenibilidade         | O case prevê evolução contínua do produto; cursos, conquistas e recompensas seguem evoluindo junto com o ranking, e não podem ficar acoplados entre si | Módulos de negócio isolados dentro do mesmo deploy                                              |
 
 ## Desafio 1 - Drivers e Evolução do Core
@@ -45,6 +45,6 @@ Nota importante sobre o estado real do projeto: o case descreve um cenário com 
 
 **Por quê, resumido:** não há ainda ASR comprovado por métrica real que justifique o custo operacional de um serviço separado (alternativa C), e manter a organização técnica atual (alternativa A) deixa ranking e cursos acoplados no mesmo namespace, sem nenhuma fronteira que proteja um módulo de mudanças no outro. O Monólito Modular resolve a manutenibilidade agora e deixa a extração futura barata, se a carga do ranking se confirmar na prática.
 
-Detalhes completos (RF, RNF, ASRs, RPCs, alternativas, trade-offs): **[ADR-001](../adr/ADR-001-monolito-modular.md)**.
+Detalhes completos (RF, RNF, ASRs, RPCs, alternativas, trade-offs, C4 Container e evidência/mini-lab): **[ADR-001](../adr/ADR-001-monolito-modular.md)**.
 
-Pendente para fechar o desafio: C4 Container e evidência/mini-lab.
+O mini-lab reorganizou o único módulo implementado hoje (cursos, US1) de "por camada técnica" para `cursos/api` + `cursos/internal`, confirmando que a modularização não exige reescrever regra nenhuma. `domain/` (TDD, 100% de cobertura) não precisou mudar de lugar.

@@ -1,4 +1,4 @@
-package com.example.grupo_5_gameeducation.entity;
+package com.example.grupo_5_gameeducation.cursos.internal;
 
 import com.example.grupo_5_gameeducation.domain.Aluno;
 import com.example.grupo_5_gameeducation.domain.Plano;

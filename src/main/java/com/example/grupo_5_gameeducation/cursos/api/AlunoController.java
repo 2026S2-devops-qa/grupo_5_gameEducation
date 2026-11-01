@@ -1,9 +1,6 @@
-package com.example.grupo_5_gameeducation.controller;
+package com.example.grupo_5_gameeducation.cursos.api;
 
-import com.example.grupo_5_gameeducation.dto.AlunoResponse;
-import com.example.grupo_5_gameeducation.dto.ConcluirCursoRequest;
-import com.example.grupo_5_gameeducation.dto.CriarAlunoRequest;
-import com.example.grupo_5_gameeducation.service.AlunoService;
+import com.example.grupo_5_gameeducation.cursos.internal.AlunoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
