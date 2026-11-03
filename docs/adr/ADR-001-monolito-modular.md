@@ -85,4 +85,55 @@ Estado real hoje: só o módulo **Cursos** existe em código (US1, implementado 
 
 ## Evidência / mini-lab
 
-Pendente.
+Único módulo implementado hoje (cursos, US1) reorganizado de "por camada técnica" para o padrão do Monólito Modular decidido neste ADR, organizado por capacidade de negócio, seguindo o formato `api/` (contrato público) e `internal/` (implementação) do gabarito. Movido com `git mv`, preservando histórico, e verificado com `mvn clean verify` após a mudança: build verde, 4 testes passando, cobertura do `domain` intocada em 100%.
+
+### Estrutura antes (por camada técnica)
+
+```
+controller/AlunoController.java
+dto/AlunoResponse.java
+dto/ConcluirCursoRequest.java
+dto/CriarAlunoRequest.java
+entity/AlunoEntity.java
+repository/AlunoRepository.java
+service/AlunoService.java
+service/AlunoNaoEncontradoException.java
+domain/Aluno.java
+domain/Curso.java
+domain/Plano.java
+```
+
+### Estrutura depois (Monólito Modular, por capacidade de negócio)
+
+```
+cursos/
+  api/
+    AlunoController.java
+    AlunoResponse.java
+    ConcluirCursoRequest.java
+    CriarAlunoRequest.java
+  internal/
+    AlunoEntity.java
+    AlunoRepository.java
+    AlunoService.java
+    AlunoNaoEncontradoException.java
+domain/
+  Aluno.java
+  Curso.java
+  Plano.java
+```
+
+`domain/` não mudou de lugar. Isso não é uma omissão, é um achado: a disciplina de TDD/ATDD já tinha isolado essa parte antes de qualquer decisão arquitetural, sem depender de `controller`, `service`, `repository` ou `entity`. A modularização técnica (item 7, 8 das 8 etapas do padrão) confirma algo que o processo de testes (A1) já tinha garantido na prática.
+
+### O que comparar
+
+| Evidência       | Antes                                                                                                                                                                                   | Depois                                                                                                                                                  |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Organização     | Por camada técnica (pacotes `controller`, `service`, `repository`, `entity`, `dto` misturando qualquer capacidade futura)                                                               | Monólito Modular, por capacidade de negócio (`cursos/api`, `cursos/internal`); próximos módulos entram do lado, sem mexer em `cursos`                                     |
+| Dependências    | `AlunoController`, `AlunoService`, `AlunoEntity` etc. viviam em pacotes technical-only, sem nenhuma fronteira nomeada entre "o que é contrato" e "o que é implementação"                | `cursos.api` (Controller + DTOs) depende de `cursos.internal` (Service + Repository + Entity); a direção da dependência é explícita pelo nome do pacote |
+| Testes          | `AlunoTest` já testava só o `domain`, sem acoplamento com as camadas técnicas                                                                                                           | Sem mudança no padrão de teste: `domain` continua coberto a 100%, isolado de `cursos`                                                                   |
+| Evolução futura | Criar ranking/conquistas/recompensas significaria decidir, a cada nova funcionalidade, se os arquivos entram nos mesmos pacotes `controller`/`service`/`entity` já populados por cursos | Ranking, conquistas e recompensas nascem como `ranking/api` + `ranking/internal`, `conquistas/api` + `conquistas/internal` etc., sem reabrir `cursos`   |
+
+### Conclusão
+
+A reorganização confirmou a hipótese do ADR: aplicar o Monólito Modular, separando por capacidade de negócio, não exigiu reescrever nenhuma regra, só mover 8 arquivos e ajustar pacote/imports. Nenhum comportamento mudou (os 3 testes de aceitação do domínio e o teste de contexto da aplicação continuam verdes, sem alteração). O que ainda não foi medido, e só seria necessário se a extração do ranking (alternativa C) voltasse à mesa: throughput e latência reais do módulo de ranking sob carga, que hoje nem existe em código.
