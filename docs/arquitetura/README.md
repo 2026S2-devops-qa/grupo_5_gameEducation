@@ -23,11 +23,14 @@ Nota importante sobre o estado real do projeto: o case descreve um cenário com 
 | #   | Desafio                     | Status    | ADR                                           |
 | --- | --------------------------- | --------- | --------------------------------------------- |
 | 1   | Drivers e Evolução do Core  | Concluído | [ADR-001](../adr/ADR-001-monolito-modular.md) |
-| 2   | Organização Interna do Core | a fazer   | -                                             |
-| 3   | Serviço Python e IA         | a fazer   | -                                             |
-| 4   | Comunicação e Eventos       | a fazer   | -                                             |
-| 5   | IoT e MQTT                  | a fazer   | -                                             |
-| 6   | CI/CD e Observabilidade     | a fazer   | -                                             |
+| 2   | Organização Interna do Core | não realizado (substituído pela AF) | -                                             |
+| 3   | Serviço Python e IA         | não realizado (substituído pela AF) | -                                             |
+| 4   | Comunicação e Eventos       | não realizado (substituído pela AF) | -                                             |
+| 5   | IoT e MQTT                  | não realizado (substituído pela AF) | -                                             |
+| 6   | CI/CD e Observabilidade     | não realizado (substituído pela AF) | -                                             |
+| AF  | Avaliação Final: plataforma de educação corporativa inteligente | Decidido, implementação em andamento | [ADR-AF](../adr/ADR-AF-arquitetura-hibrida.md) |
+
+Só o Desafio 1 do Architecture Lab foi realizado. Os desafios 2 a 6 não foram feitos: a disciplina passou para a Avaliação Final, cujo estudo de caso já cobre parte dos temas previstos para eles (organização interna do Core, serviço Python e IA, comunicação e eventos). Essas decisões estão registradas no ADR-AF, e não em ADRs numerados por desafio.
 
 ## Matriz cumulativa de ASRs
 
@@ -48,3 +51,13 @@ Nota importante sobre o estado real do projeto: o case descreve um cenário com 
 Detalhes completos (RF, RNF, ASRs, RPCs, alternativas, trade-offs, C4 Container e evidência/mini-lab): **[ADR-001](../adr/ADR-001-monolito-modular.md)**.
 
 O mini-lab reorganizou o único módulo implementado hoje (cursos, US1) de "por camada técnica" para `cursos/api` + `cursos/internal`, confirmando que a modularização não exige reescrever regra nenhuma. `domain/` (TDD, 100% de cobertura) não precisou mudar de lugar.
+
+## Avaliação Final (AF)
+
+**Cenário:** plataforma de educação corporativa com avaliação de competências por ML, recomendação de cursos por RAG e agentes de IA, com RabbitMQ para mensageria e uma equipe reduzida.
+
+**Decisão:** arquitetura **híbrida**. O Core continua monólito modular (mantém o ADR-001), e as capacidades de IA (ml-service em FastAPI, ai-service em Spring AI) ficam em serviços próprios, atrás de um API Gateway, com RabbitMQ para o treinamento de modelos. Decisão complementar: arquitetura **hexagonal** nos serviços com regra de negócio.
+
+**Por quê, resumido:** separar a IA atende à evolução independente dela (RNF04) e ao treino com o ML fora do ar (RNF02), sem pagar o custo de quebrar o negócio em microsserviços que uma equipe de 3 teria que operar (RNF05).
+
+Detalhes completos (requisitos, alternativas, ASRs, REST x RabbitMQ, hexagonal, trade-offs e validação): **[ADR-AF](../adr/ADR-AF-arquitetura-hibrida.md)**.
