@@ -1,0 +1,56 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          httpclient:
+            connect-timeout: 3000
+          # Defesa extra: se algum servico interno tambem mandar header de CORS,
+          # fica so o primeiro (o do gateway). Header duplicado o navegador bloqueia.
+          default-filters:
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Vary, RETAIN_FIRST
+          # A ordem importa: a rota de IA precisa vir ANTES da generica /api/**.
+          routes:
+            # Swagger do Core: o Core nao publica porta, entao a documentacao passa pelo gateway.
+            # PreserveHostHeader faz o Core gerar links e redirects para localhost:8080.
+            - id: core-docs
+              uri: ${CORE_URL:http://localhost:8081}
+              order: 0
+              predicates:
+                - Path=/swagger-ui.html,/swagger-ui/**,/v3/api-docs/**
+              filters:
+                - PreserveHostHeader
+            - id: ai-service
+              uri: ${AI_URL:http://localhost:8082}
+              order: 1
+              predicates:
+                - Path=/api/ia/**
+            - id: core
+              uri: ${CORE_URL:http://localhost:8081}
+              order: 2
+              predicates:
+                - Path=/api/**
+
+gateway:
+  jwt:
+    # HS256 exige pelo menos 32 bytes. O default e so para desenvolvimento:
+    # em qualquer ambiente real, definir JWT_SECRET no .env.
+    secret: ${JWT_SECRET:dev-only-gameeducation-jwt-secret-troque-no-env-0123456789}
+    expiracao: 2h
+    issuer: gameeducation-gateway
+  cors:
+    allowed-origin-patterns: http://localhost:*,http://127.0.0.1:*
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

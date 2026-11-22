@@ -310,14 +310,19 @@ Aplicação, front-end (Nginx), PostgreSQL e pgAdmin rodando juntos.
 
 ## 7. Front-end (Vue 3)
 
-Front-end simples em `frontend/index.html`, com Vue 3 via CDN (sem build, sem npm). Consome os 4 endpoints da API e prova o fluxo da US1 pela tela: criar aluno (nome e plano), listar alunos com cursos liberados e conquistados, e concluir curso (título e média). Média acima de 7,0 mostra 3 cursos liberados; concluir o mesmo curso de novo não duplica. Aluno inexistente (404) vira mensagem na tela, sem quebrar.
+Front-end simples com Vue 3 via CDN (sem build, sem npm). Na AC2 era uma tela só. Na AF virou uma casca com login e abas (ver a seção [AF: RNF03](#af-rnf03-api-gateway-jwt-e-controle-de-acesso)), e a tela da US1 passou para a aba "Gamificação (US1)", em `frontend/js/alunos.js`. Ela prova o fluxo da US1 pela tela: criar aluno (nome e plano), listar alunos com cursos liberados e conquistados, e concluir curso (título e média). Média acima de 7,0 mostra 3 cursos liberados; concluir o mesmo curso de novo não duplica. Aluno inexistente (404) vira mensagem na tela, sem quebrar.
 
-O CORS está liberado para qualquer porta de localhost em `config.CorsConfig`, então o servidor estático do front pode subir em 5173 ou em qualquer outra porta.
+Na AF o front não fala mais com o Core direto: todas as chamadas passam pelo API Gateway em `http://localhost:8080`, com JWT. O CORS fica só no gateway (o antigo `config.CorsConfig` do Core foi removido).
 
 ### Como rodar
 
-1. Suba o backend (perfil padrão, H2): `./mvnw spring-boot:run` — fica em `http://localhost:8080`.
-2. Sirva o front por um servidor estático de localhost (não abra via `file://`, senão o CORS bloqueia a chamada):
+Com Docker (forma oficial): `docker compose up --build` e abrir `http://localhost:5173`.
+
+Sem Docker, para desenvolvimento:
+
+1. Suba o Core (perfil padrão, H2): `./mvnw spring-boot:run`. Ele fica em `http://localhost:8081`.
+2. Suba o gateway em outro terminal: `cd gateway` e `./mvnw spring-boot:run`. Ele fica em `http://localhost:8080` e encaminha `/api/**` para o Core em 8081.
+3. Sirva o front por um servidor estático de localhost (não abra via `file://`):
 
    ```
    cd frontend
@@ -325,4 +330,180 @@ O CORS está liberado para qualquer porta de localhost em `config.CorsConfig`, e
    ```
 
    e abra `http://localhost:5173`.
-3. A URL da API fica no campo **API** no topo da página (padrão `http://localhost:8080`), salva no `localStorage` — não fica hardcoded no código. Se o backend estiver em outra porta, basta editar ali.
+4. A URL do gateway fica no campo **API** da tela de login (padrão `http://localhost:8080`), salva no `localStorage`.
+
+## AF: RNF03, API Gateway, JWT e controle de acesso
+
+Responsável: Bruno da Silveira Escanhoela. Requisito do case: *"Proteger os dados pessoais e controlar o acesso dos agentes às informações e ferramentas."*
+
+### O que faz
+
+O gateway (`gateway/`, Spring Cloud Gateway) é a **única porta de entrada da API**. Ele:
+
+1. autentica o usuário em `POST /auth/login` e devolve um JWT;
+2. valida o JWT em toda chamada a `/api/**` (assinatura, expiração e emissor);
+3. aplica as regras de acesso por papel (`ADMIN` ou `COLABORADOR`);
+4. **sobrescreve** os headers de identidade e repassa a requisição ao serviço certo;
+5. concentra o CORS (o navegador só fala com o gateway).
+
+Core, ai-service e ml-service **não publicam porta no host**: só são alcançáveis pela rede interna do compose, então o único caminho até eles é o gateway. Os serviços internos não validam JWT, só leem os headers que o gateway manda.
+
+```mermaid
+sequenceDiagram
+    actor U as Navegador
+    participant GW as Gateway :8080
+    participant C as Core :8081 (interno)
+    U->>GW: POST /auth/login {login, senha}
+    GW-->>U: 200 {token, login, roles, colaboradorId}
+    U->>GW: GET /api/alunos + Authorization: Bearer (e um X-User-Roles: ADMIN forjado)
+    GW->>GW: valida JWT, confere papel da rota
+    GW->>GW: apaga X-User-* e X-Colaborador-Id do cliente, grava os do JWT
+    GW->>C: GET /api/alunos + X-User-Id: ana, X-User-Roles: COLABORADOR, X-Colaborador-Id: 1
+    C-->>U: 200 (via gateway)
+```
+
+### Versões
+
+Gerado pelo [start.spring.io](https://start.spring.io) com a combinação estável disponível: **Spring Boot 4.1.3 + Spring Cloud 2025.1.4** (Spring Cloud Gateway Server WebFlux 5.0.4), Java 17. A linha 3.5.x citada no plano já não é oferecida pelo start.spring.io, e o Boot 4.2.0 só tem Spring Cloud em versão SNAPSHOT. A 4.1.x é a mesma linha do Core (4.1.1).
+
+### Rotas
+
+| Rota | Destino | Acesso |
+|---|---|---|
+| `POST /auth/login` | o próprio gateway | público |
+| `GET /actuator/health` | o próprio gateway | público (healthcheck do compose) |
+| `/swagger-ui.html`, `/swagger-ui/**`, `/v3/api-docs/**` | Core (`app:8081`) | público, só documentação |
+| `/api/ia/**` | ai-service (`ai-service:8082`) | autenticado. Declarada **antes** da rota genérica |
+| `/api/**` | Core (`app:8081`) | autenticado, com as regras de ADMIN abaixo |
+| qualquer outra | nenhuma | negado |
+
+Rotas só de **ADMIN** (COLABORADOR recebe `403`): `POST /api/cursos`, `POST /api/colaboradores`, `GET /api/colaboradores` (listar todos), `POST /api/treinamentos`, `POST /api/ranking/fechamentos/**`. As regras que dependem do dado (por exemplo "só o próprio colaborador vê o seu perfil") ficam no serviço, que lê os headers.
+
+Erros seguem o formato único do projeto, `{"erro": "mensagem"}`:
+
+| Situação | Resposta |
+|---|---|
+| login ou senha errados | `401 {"erro":"Login ou senha invalidos."}` |
+| sem token, token adulterado, expirado ou assinado com outra chave | `401` |
+| papel sem permissão | `403` |
+| serviço de destino fora do ar (ex.: ai-service) | `503 {"erro":"Servico 'ai-service' indisponivel no momento..."}` |
+
+### Contrato de identidade (gateway → serviços)
+
+| Header | Exemplo | Origem |
+|---|---|---|
+| `X-User-Id` | `ana` | claim `sub` do JWT |
+| `X-User-Roles` | `COLABORADOR` | claim `roles` (separados por vírgula) |
+| `X-Colaborador-Id` | `1` | claim `colaboradorId` (vazio para o admin) |
+
+Usuários de demonstração (em memória no gateway, senhas guardadas só como hash BCrypt):
+
+| Login | Senha | Papel | Colaborador |
+|---|---|---|---|
+| `admin` | `admin123` | `ADMIN` | (nenhum) |
+| `ana` | `ana123` | `COLABORADOR` | 1 |
+| `carlos` | `carlos123` | `COLABORADOR` | 2 |
+
+### Decisões
+
+- **Anti-falsificação de identidade.** O `IdentidadeHeadersFilter` apaga qualquer `X-User-*` e `X-Colaborador-Id` que venha do cliente antes de gravar os valores do JWT validado. Sem isso, qualquer um mandaria `X-User-Roles: ADMIN`. O teste `headersForjadosSaoSobrescritos` cobre esse caso. Com o filtro desligado, ele falha mostrando a `ana` chegando ao Core como `admin`.
+- **JWT HS256** assinado com `JWT_SECRET` (variável de ambiente, mínimo de 32 bytes, senão o gateway não sobe). Claims `sub`, `roles`, `colaboradorId`, `iss`; validade de 2 h. Sem sessão no servidor (stateless).
+- **CORS só no gateway, configurado na cadeia do Spring Security** (e não no `globalcors` do gateway). Assim as respostas `401` e `403` também levam o header de CORS, e o front consegue ler o `401` para fazer logout. Com `globalcors`, o navegador esconderia o `401` como erro de rede. Por defesa, o filtro `DedupeResponseHeader` remove header de CORS duplicado, caso algum serviço interno também mande.
+- **Serviço fora do ar vira `503` com mensagem clara**, em vez de `500`. A IA pode cair sem que cadastro e consulta parem de funcionar (RNF04).
+- **Swagger do Core pelo gateway.** Como o Core não publica porta, a documentação passa pelo gateway em `http://localhost:8080/swagger-ui.html`, com o botão **Authorize** para colar o token.
+- **Healthchecks encadeados.** O gateway só sobe com o Core `healthy` (actuator `/health` no Core), e o Core só sobe com o Postgres `healthy`.
+- **Segredos.** O `.env` está no `.gitignore` e no `.dockerignore`. No repositório vai só o `.env.example`. O gateway recebe só o `JWT_SECRET` (a chave do LLM não entra no container dele).
+- **Sem hexagonal no gateway**: ele é infraestrutura pura (rotas, JWT, filtros), sem regra de negócio. A decisão da hexagonal vale onde existe domínio.
+
+### Front base (login e abas)
+
+`frontend/index.html` é só a casca. Ela tem a tela de login, guarda a sessão no `sessionStorage` (some ao fechar a aba) e oferece o helper `api()`. O `api()` manda o `Authorization: Bearer` e faz logout automático no `401`. A casca também monta a navegação por abas. Cada aba é um arquivo próprio, registrado em `window.ABAS`, então cada integrante mexe só no seu arquivo:
+
+| Arquivo | Aba | Dono |
+|---|---|---|
+| `js/colaboradores.js` | Colaboradores e Cursos (RF01) | Bruno |
+| `js/ia.js` | Assistente IA (RF03, RF04) | João |
+| `js/ml.js` | Competências e ML (RF02, RF05) | Gabriel |
+| `js/ranking.js` | Ranking | Gabriel |
+| `js/alunos.js` | Gamificação (US1, da AC1) | Bruno |
+
+O contrato de uma aba (props `api` e `usuario`) está comentado no próprio `index.html`.
+
+### Testes
+
+`gateway/src/test` tem 24 testes com `WebTestClient`. Core e ai-service são substituídos por servidores HTTP falsos que devolvem os headers recebidos. Os testes cobrem:
+
+- login válido, senha errada, login inexistente e corpo vazio;
+- `401` sem token, com token adulterado, com token expirado e com token assinado com outra chave;
+- `403` da `ana` em `POST /api/cursos` e nas demais rotas de ADMIN;
+- sobrescrita dos headers forjados, para a `ana` e para o admin;
+- roteamento de `/api/ia/**` para o ai-service;
+- CORS no preflight e no `401`;
+- `503` com o serviço fora do ar.
+
+```
+cd gateway
+./mvnw clean verify
+```
+
+### Como testar com a aplicação rodando
+
+Subir tudo:
+
+```
+docker compose up --build
+```
+
+Login da `ana` e token guardado numa variável:
+
+```
+TOKEN=$(curl -s -X POST http://localhost:8080/auth/login -H "Content-Type: application/json" -d '{"login":"ana","senha":"ana123"}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["token"])')
+```
+
+Sem token dá `401`:
+
+```
+curl -i http://localhost:8080/api/alunos
+```
+
+`ana` tentando criar curso (rota de ADMIN) dá `403`:
+
+```
+curl -i -X POST http://localhost:8080/api/cursos -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{}'
+```
+
+`ana` forjando `X-User-Roles: ADMIN` continua sendo COLABORADOR (continua recebendo `403`):
+
+```
+curl -i -X POST http://localhost:8080/api/cursos -H "Authorization: Bearer $TOKEN" -H "X-User-Roles: ADMIN" -H "Content-Type: application/json" -d '{}'
+```
+
+Só o gateway publica porta de API (o `app` aparece sem mapeamento para o host):
+
+```
+docker compose ps
+```
+
+No navegador: `http://localhost:5173` (login e abas) e `http://localhost:8080/swagger-ui.html` (Swagger do Core).
+
+### Evidências
+
+Front com login e abas, logado como `ana` (COLABORADOR):
+
+![Login e abas](evidencias/af/rnf03/01-login-front.png)
+
+Chamada sem token: `401` no formato `{"erro"}`:
+
+![401 sem token](evidencias/af/rnf03/02-401-sem-token.png)
+
+`ana` forjando `X-User-Roles: ADMIN` em `POST /api/cursos`: o gateway ignora o header e responde `403`:
+
+![403 com header forjado](evidencias/af/rnf03/03-403-ana-admin.png)
+
+`docker compose ps`: só o gateway publica porta de API (`0.0.0.0:8080`). O Core (`app`) fica só na rede interna (`8081/tcp`):
+
+![docker compose ps](evidencias/af/rnf03/04-docker-ps.png)
+
+Swagger do Core acessado pelo gateway, com o botão Authorize para o JWT:
+
+![Swagger pelo gateway](evidencias/af/rnf03/05-swagger.png)

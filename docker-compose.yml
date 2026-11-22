@@ -1,9 +1,31 @@
 services:
+  # API Gateway: UNICA porta de API publicada no host (RNF03). Valida o JWT, aplica as regras
+  # por papel e repassa a identidade aos servicos internos nos headers X-User-*.
+  gateway:
+    build: ./gateway
+    container_name: gameeducation-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      CORE_URL: http://app:8081
+      AI_URL: http://ai-service:8082
+      # Lido do .env da raiz (o compose le sozinho). Sem .env, usa o default de desenvolvimento.
+      # So a variavel que o gateway precisa: a chave do LLM nao entra neste container.
+      JWT_SECRET: ${JWT_SECRET:-dev-only-gameeducation-jwt-secret-troque-no-env-0123456789}
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      start_period: 30s
+      retries: 10
+
+  # Core (monolito modular). Sem "ports": so e alcancavel pela rede interna, via gateway.
   app:
     build: .
     container_name: gameeducation-app
-    ports:
-      - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/gameeducation
@@ -12,6 +34,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8081/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      start_period: 40s
+      retries: 10
 
   db:
     image: postgres:16-alpine
@@ -44,6 +72,7 @@ services:
     depends_on:
       - db
 
+  # Front (Vue 3 via CDN, servido pelo Nginx). Fala so com o gateway em http://localhost:8080.
   frontend:
     image: nginx:alpine
     container_name: gameeducation-frontend
@@ -52,7 +81,7 @@ services:
     volumes:
       - ./frontend:/usr/share/nginx/html:ro
     depends_on:
-      - app
+      - gateway
 
 volumes:
   pgdata:

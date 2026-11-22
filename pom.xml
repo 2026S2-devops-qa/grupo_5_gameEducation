@@ -43,6 +43,12 @@
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
 
+		<!-- Health check usado pelo docker compose (o gateway so sobe com o Core saudavel) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
 		<!-- Swagger / OpenAPI  -->
 		<dependency>
 			<groupId>org.springdoc</groupId>
