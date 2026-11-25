@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Educação Continuada Gamificada — US1</title>
-    <!-- Vue 3 via CDN: sem build, sem npm. Basta servir este arquivo. -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <title>GameEducation</title>
+    <!-- Vue 3 via CDN, versao fixa: sem build, sem npm. Basta servir esta pasta. -->
+    <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -13,214 +13,261 @@
             margin: 0; padding: 24px;
             background: #eef2f7; color: #1f2937;
         }
-        .wrap { max-width: 960px; margin: 0 auto; }
-        header h1 { margin: 0 0 4px; font-size: 1.7rem; }
-        header p { margin: 0 0 4px; color: #4b5563; }
-        .apibar { font-size: .85rem; color: #6b7280; display: flex; gap: 8px; align-items: center; margin: 12px 0 20px; }
-        .apibar input { flex: 1; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: .85rem; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
-        .card {
-            background: #fff; padding: 20px; border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,.08);
+        .wrap { max-width: 1040px; margin: 0 auto; }
+
+        /* Cabecalho e abas */
+        .topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .topo h1 { margin: 0; font-size: 1.6rem; }
+        .topo .sub { margin: 2px 0 0; color: #4b5563; font-size: .9rem; }
+        .sessao { display: flex; align-items: center; gap: 10px; font-size: .9rem; }
+        .sessao button { width: auto; padding: 6px 14px; }
+        .abas { display: flex; gap: 6px; margin: 20px 0 18px; border-bottom: 2px solid #d1d5db; flex-wrap: wrap; }
+        .abas button {
+            width: auto; background: transparent; color: #4b5563; border-radius: 8px 8px 0 0;
+            padding: 10px 16px; margin-bottom: -2px; border-bottom: 2px solid transparent;
         }
+        .abas button:hover { background: #e5e7eb; }
+        .abas button.ativa { color: #4f46e5; border-bottom-color: #4f46e5; background: #fff; }
+
+        /* Componentes reaproveitados pelas abas (js/*.js) */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } body { padding: 16px; } }
+        .card { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
         .card h2 { margin: 0 0 14px; font-size: 1.1rem; }
         label { display: block; font-size: .8rem; color: #374151; margin-bottom: 4px; font-weight: 600; }
-        input, select, button { width: 100%; padding: 10px; border-radius: 8px; font-size: .95rem; }
-        input, select { border: 1px solid #d1d5db; margin-bottom: 14px; background: #fff; }
-        button {
-            border: 0; background: #4f46e5; color: #fff; font-weight: 600;
-            cursor: pointer; transition: background .15s;
-        }
+        input, select, textarea, button { width: 100%; padding: 10px; border-radius: 8px; font-size: .95rem; font-family: inherit; }
+        input, select, textarea { border: 1px solid #d1d5db; margin-bottom: 14px; background: #fff; }
+        button { border: 0; background: #4f46e5; color: #fff; font-weight: 600; cursor: pointer; transition: background .15s; }
         button:hover { background: #4338ca; }
+        button:disabled { background: #9ca3af; cursor: not-allowed; }
         button.ghost { background: #e5e7eb; color: #374151; }
         button.ghost:hover { background: #d1d5db; }
         .msg { margin: 18px 0; padding: 12px 14px; border-radius: 8px; font-size: .9rem; }
         .msg.ok { background: #dcfce7; color: #166534; }
         .msg.err { background: #fee2e2; color: #991b1b; }
-        .alunos { margin-top: 24px; }
-        .alunos-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .alunos-head h2 { margin: 0; font-size: 1.2rem; }
-        .alunos-head button { width: auto; padding: 8px 14px; }
-        .lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
-        .aluno {
-            background: #fff; border-radius: 12px; padding: 16px;
-            box-shadow: 0 1px 3px rgba(0,0,0,.08); border-left: 5px solid #cbd5e1;
-        }
-        .aluno.premiado { border-left-color: #16a34a; }
-        .aluno .nome { font-weight: 700; margin-bottom: 6px; }
-        .badge {
-            display: inline-block; font-size: .72rem; font-weight: 700;
-            padding: 2px 8px; border-radius: 999px; margin-bottom: 10px;
-        }
-        .badge.BASICO { background: #e0e7ff; color: #3730a3; }
-        .badge.PREMIUM { background: #fef3c7; color: #92400e; }
-        .stats { display: flex; gap: 10px; }
-        .stat { flex: 1; text-align: center; background: #f3f4f6; border-radius: 8px; padding: 8px 4px; }
-        .stat .num { font-size: 1.4rem; font-weight: 800; line-height: 1; }
-        .stat .lbl { font-size: .68rem; color: #6b7280; text-transform: uppercase; letter-spacing: .3px; }
-        .stat.lib .num { color: #4f46e5; }
-        .stat.conq .num { color: #16a34a; }
+        .msg.info { background: #e0e7ff; color: #3730a3; }
         .vazio { color: #6b7280; font-size: .9rem; }
+        .tag { display: inline-block; font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #e0e7ff; color: #3730a3; }
+        .tag.admin { background: #fef3c7; color: #92400e; }
+        table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e5e7eb; }
+        th { font-size: .75rem; text-transform: uppercase; color: #6b7280; }
+
+        /* Login */
+        .login { max-width: 380px; margin: 60px auto 0; }
+        .login .dica { font-size: .8rem; color: #6b7280; margin-top: 14px; line-height: 1.5; }
+        .login code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+        .apibar { font-size: .8rem; color: #6b7280; margin-top: 18px; }
+        .apibar input { font-size: .8rem; padding: 6px 8px; margin: 4px 0 0; }
+
+        /* Aba em construcao */
+        .construcao { text-align: center; padding: 48px 20px; color: #6b7280; }
+        .construcao h2 { color: #374151; }
     </style>
 </head>
 <body>
 <div id="app" class="wrap">
-    <header>
-        <h1>Educação Continuada Gamificada</h1>
-        <p><strong>US1:</strong> concluiu um curso com média acima de 7,0 → o aluno ganha <strong>3 cursos liberados</strong>. Concluir o mesmo curso de novo não bonifica outra vez.</p>
-    </header>
 
-    <div class="apibar">
-        <label style="margin:0">API:</label>
-        <input v-model="apiBase" @change="salvarApi" />
-    </div>
-
-    <div class="grid">
-        <!-- Criar aluno -->
-        <div class="card">
-            <h2>Criar aluno</h2>
-            <label>Nome</label>
-            <input v-model="novoAluno.nome" placeholder="Ex.: Bruno da Silveira Escanhoela" @keyup.enter="criarAluno" />
-            <label>Plano</label>
-            <select v-model="novoAluno.plano">
-                <option value="BASICO">BASICO</option>
-                <option value="PREMIUM">PREMIUM</option>
-            </select>
-            <button @click="criarAluno">Criar aluno</button>
-        </div>
-
-        <!-- Concluir curso -->
-        <div class="card">
-            <h2>Concluir curso</h2>
-            <label>Aluno</label>
-            <select v-model="conclusao.alunoId">
-                <option disabled value="">Selecione um aluno</option>
-                <option v-for="a in alunos" :key="a.id" :value="a.id">{{ a.id }} — {{ a.nome }}</option>
-            </select>
-            <label>Título do curso</label>
-            <input v-model="conclusao.tituloCurso" placeholder="Ex.: Fundamentos de Agile Testing" />
-            <label>Média (0 a 10)</label>
-            <input v-model.number="conclusao.media" type="number" step="0.1" min="0" max="10" placeholder="Ex.: 8.5" />
-            <button @click="concluirCurso">Registrar conclusão</button>
+    <!-- ===================== LOGIN ===================== -->
+    <div v-if="!sessao" class="card login">
+        <h1 style="margin:0 0 4px;font-size:1.5rem">GameEducation</h1>
+        <p class="vazio" style="margin:0 0 20px">Plataforma de Educação Corporativa Inteligente</p>
+        <label>Login</label>
+        <input v-model.trim="loginForm.login" autocomplete="username" @keyup.enter="entrar" />
+        <label>Senha</label>
+        <input v-model="loginForm.senha" type="password" autocomplete="current-password" @keyup.enter="entrar" />
+        <button :disabled="entrando" @click="entrar">{{ entrando ? 'Entrando...' : 'Entrar' }}</button>
+        <div v-if="erroLogin" class="msg err">{{ erroLogin }}</div>
+        <p class="dica">
+            Usuários de demonstração:<br />
+            <code>admin</code> / <code>admin123</code> (ADMIN)<br />
+            <code>ana</code> / <code>ana123</code> (COLABORADOR 1)<br />
+            <code>carlos</code> / <code>carlos123</code> (COLABORADOR 2)
+        </p>
+        <div class="apibar">
+            API (gateway):
+            <input v-model.trim="apiBase" @change="salvarApi" />
         </div>
     </div>
 
-    <div v-if="mensagem" class="msg" :class="erro ? 'err' : 'ok'">{{ mensagem }}</div>
-
-    <section class="alunos">
-        <div class="alunos-head">
-            <h2>Alunos</h2>
-            <button class="ghost" @click="listarAlunos">Atualizar</button>
-        </div>
-        <p v-if="alunos.length === 0" class="vazio">Nenhum aluno cadastrado ainda. Crie o primeiro acima.</p>
-        <div class="lista">
-            <div v-for="a in alunos" :key="a.id" class="aluno" :class="{ premiado: a.cursosLiberados > 0 }">
-                <div class="nome">{{ a.nome }}</div>
-                <span class="badge" :class="a.plano">{{ a.plano }}</span>
-                <div class="stats">
-                    <div class="stat lib"><div class="num">{{ a.cursosLiberados }}</div><div class="lbl">Liberados</div></div>
-                    <div class="stat conq"><div class="num">{{ a.cursosConquistados }}</div><div class="lbl">Conquistados</div></div>
-                </div>
+    <!-- ===================== APLICACAO ===================== -->
+    <template v-else>
+        <header class="topo">
+            <div>
+                <h1>GameEducation</h1>
+                <p class="sub">Plataforma de Educação Corporativa Inteligente</p>
             </div>
-        </div>
-    </section>
+            <div class="sessao">
+                <span><strong>{{ usuario.login }}</strong></span>
+                <span v-for="r in usuario.roles" :key="r" class="tag" :class="{ admin: r === 'ADMIN' }">{{ r }}</span>
+                <button class="ghost" @click="sair()">Sair</button>
+            </div>
+        </header>
+
+        <nav class="abas">
+            <button v-for="aba in abas" :key="aba.id"
+                    :class="{ ativa: aba.id === abaAtiva }"
+                    @click="abrirAba(aba.id)">{{ aba.titulo }}</button>
+        </nav>
+
+        <div v-if="avisoSessao" class="msg info">{{ avisoSessao }}</div>
+
+        <!-- Cada aba e um componente Vue registrado em window.ABAS por um arquivo js/<aba>.js -->
+        <component v-if="abaAtual" :is="abaAtual.componente" :key="abaAtual.id" :api="api" :usuario="usuario" />
+    </template>
 </div>
+
+<!--
+    CONTRATO DAS ABAS (cada integrante mexe so no proprio arquivo, sem tocar neste index.html):
+
+    window.ABAS.<id> = {
+        titulo: 'Texto da aba',
+        ordem: 10,                  // posicao na barra de abas (menor vem antes)
+        componente: {               // componente Vue 3 normal (template como string)
+            props: ['api', 'usuario'],
+            template: `...`,
+            ...
+        }
+    };
+
+    Props recebidas:
+      api(path, { method, body })  -> Promise com o JSON da resposta. Ja manda "Authorization: Bearer".
+                                      "body" e um objeto (o helper faz o JSON.stringify).
+                                      Erro HTTP vira exception com .status e .message (o {"erro"} da API).
+                                      401 faz logout automatico.
+      usuario                      -> { login, roles: ['ADMIN'|'COLABORADOR'], colaboradorId, admin: true|false }
+-->
+<script>window.ABAS = {};</script>
+<script src="js/colaboradores.js"></script>
+<script src="js/ia.js"></script>
+<script src="js/ml.js"></script>
+<script src="js/ranking.js"></script>
+<script src="js/alunos.js"></script>
 
 <script>
     const { createApp } = Vue;
+    const CHAVE_SESSAO = 'gameeducation.sessao';
+
+    function lerSessao() {
+        try {
+            const salvo = sessionStorage.getItem(CHAVE_SESSAO);
+            return salvo ? JSON.parse(salvo) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function lerApiBase() {
+        try {
+            return localStorage.getItem('apiBase') || 'http://localhost:8080';
+        } catch (e) {
+            return 'http://localhost:8080';
+        }
+    }
 
     createApp({
         data() {
             return {
-                // URL base da API, editável e persistida (não fica hardcoded no código)
-                apiBase: localStorage.getItem('apiBase') || 'http://localhost:8080',
-                mensagem: '',
-                erro: false,
-                alunos: [],
-                novoAluno: { nome: '', plano: 'BASICO' },
-                conclusao: { alunoId: '', tituloCurso: '', media: null }
+                // URL do gateway, editavel na tela de login (padrao http://localhost:8080)
+                apiBase: lerApiBase(),
+                // Sessao fica no sessionStorage: some ao fechar a aba do navegador
+                sessao: lerSessao(),
+                loginForm: { login: '', senha: '' },
+                entrando: false,
+                erroLogin: '',
+                avisoSessao: '',
+                abaAtiva: null
             };
+        },
+        computed: {
+            usuario() {
+                if (!this.sessao) return null;
+                const roles = this.sessao.roles || [];
+                return {
+                    login: this.sessao.login,
+                    roles,
+                    colaboradorId: this.sessao.colaboradorId ?? null,
+                    admin: roles.includes('ADMIN')
+                };
+            },
+            abas() {
+                return Object.entries(window.ABAS)
+                    .map(([id, aba]) => ({ id, ...aba }))
+                    .sort((a, b) => (a.ordem ?? 99) - (b.ordem ?? 99));
+            },
+            abaAtual() {
+                return this.abas.find(a => a.id === this.abaAtiva) || this.abas[0] || null;
+            }
         },
         methods: {
             salvarApi() {
-                localStorage.setItem('apiBase', this.apiBase);
-                this.listarAlunos();
+                try { localStorage.setItem('apiBase', this.apiBase); } catch (e) { /* sem storage */ }
             },
-            notificar(texto, ehErro = false) {
-                this.mensagem = texto;
-                this.erro = ehErro;
+            abrirAba(id) {
+                this.abaAtiva = id;
+                this.avisoSessao = '';
             },
-            // Wrapper de fetch: centraliza as 4 chamadas e trata erros (inclusive 404)
-            async chamar(path, options = {}) {
-                const resp = await fetch(this.apiBase + path, {
-                    ...options,
-                    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
-                });
-                if (resp.status === 404) {
-                    const e = new Error('Aluno não encontrado (404).');
-                    e.status = 404;
-                    throw e;
-                }
-                if (!resp.ok) throw new Error('Erro na API (HTTP ' + resp.status + ').');
-                const texto = await resp.text();
-                return texto ? JSON.parse(texto) : null;
-            },
-            async listarAlunos() {
-                try {
-                    this.alunos = await this.chamar('/api/alunos');
-                } catch (e) {
-                    this.notificar('Não consegui carregar os alunos. O backend está no ar em ' + this.apiBase + '? (' + e.message + ')', true);
-                }
-            },
-            async criarAluno() {
-                if (!this.novoAluno.nome.trim()) {
-                    this.notificar('Informe o nome do aluno.', true);
+            async entrar() {
+                if (!this.loginForm.login || !this.loginForm.senha) {
+                    this.erroLogin = 'Informe login e senha.';
                     return;
                 }
+                this.entrando = true;
+                this.erroLogin = '';
                 try {
-                    const criado = await this.chamar('/api/alunos', {
-                        method: 'POST',
-                        body: JSON.stringify(this.novoAluno)
-                    });
-                    this.notificar('Aluno "' + criado.nome + '" criado (id ' + criado.id + ').');
-                    this.novoAluno = { nome: '', plano: 'BASICO' };
-                    await this.listarAlunos();
-                    this.conclusao.alunoId = criado.id; // já deixa selecionado para concluir curso
+                    const resp = await this.api('/auth/login', { method: 'POST', body: this.loginForm });
+                    this.sessao = resp;
+                    sessionStorage.setItem(CHAVE_SESSAO, JSON.stringify(resp));
+                    this.loginForm = { login: '', senha: '' };
+                    this.avisoSessao = '';
+                    this.abaAtiva = this.abas.length ? this.abas[0].id : null;
                 } catch (e) {
-                    this.notificar('Falha ao criar aluno: ' + e.message, true);
+                    this.erroLogin = e.status === 401 ? 'Login ou senha inválidos.' : e.message;
+                } finally {
+                    this.entrando = false;
                 }
             },
-            async concluirCurso() {
-                if (!this.conclusao.alunoId) { this.notificar('Selecione um aluno.', true); return; }
-                if (!this.conclusao.tituloCurso.trim()) { this.notificar('Informe o título do curso.', true); return; }
-                if (this.conclusao.media === null || isNaN(this.conclusao.media)) { this.notificar('Informe a média.', true); return; }
+            sair(motivo) {
+                this.sessao = null;
+                sessionStorage.removeItem(CHAVE_SESSAO);
+                this.erroLogin = motivo || '';
+            },
+            // Helper unico de chamada a API (todas as abas usam este)
+            async api(path, opcoes = {}) {
+                const headers = { ...(opcoes.headers || {}) };
+                if (opcoes.body !== undefined) headers['Content-Type'] = 'application/json';
+                if (this.sessao && this.sessao.token) headers['Authorization'] = 'Bearer ' + this.sessao.token;
+
+                let resp;
                 try {
-                    const atualizado = await this.chamar('/api/alunos/' + this.conclusao.alunoId + '/conclusoes', {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            tituloCurso: this.conclusao.tituloCurso,
-                            media: this.conclusao.media
-                        })
+                    resp = await fetch(this.apiBase + path, {
+                        method: opcoes.method || 'GET',
+                        headers,
+                        body: opcoes.body !== undefined ? JSON.stringify(opcoes.body) : undefined
                     });
-                    this.notificar('Conclusão registrada para "' + atualizado.nome + '": ' +
-                        atualizado.cursosLiberados + ' liberado(s), ' +
-                        atualizado.cursosConquistados + ' conquistado(s).');
-                    this.conclusao.tituloCurso = '';
-                    this.conclusao.media = null;
-                    await this.listarAlunos();
                 } catch (e) {
-                    if (e.status === 404) {
-                        this.notificar('Esse aluno não existe mais (404). Atualize a lista.', true);
-                        await this.listarAlunos();
-                    } else {
-                        this.notificar('Falha ao concluir curso: ' + e.message, true);
-                    }
+                    const erro = new Error('Não consegui falar com a API em ' + this.apiBase + '. O gateway está no ar?');
+                    erro.status = 0;
+                    throw erro;
                 }
+
+                const texto = await resp.text();
+                let dados = null;
+                try { dados = texto ? JSON.parse(texto) : null; } catch (e) { dados = texto; }
+
+                // Token expirado ou invalido: volta para o login
+                if (resp.status === 401 && this.sessao && path !== '/auth/login') {
+                    this.sair('Sua sessão expirou. Faça login de novo.');
+                }
+                if (!resp.ok) {
+                    const mensagem = (dados && dados.erro) || ('Erro na API (HTTP ' + resp.status + ').');
+                    const erro = new Error(mensagem);
+                    erro.status = resp.status;
+                    erro.dados = dados;
+                    throw erro;
+                }
+                return dados;
             }
-        },
-        mounted() {
-            this.listarAlunos();
         }
     }).mount('#app');
 </script>

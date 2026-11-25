@@ -36,3 +36,8 @@ docker-compose.override.yml
 
 ### Cursor ###
 .cursor/
+
+### Segredos (chave do LLM, JWT_SECRET): so o .env.example vai para o git ###
+.env
+.env.*
+!.env.example
