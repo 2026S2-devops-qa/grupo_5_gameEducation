@@ -1,10 +1,9 @@
 package com.example.grupo_5_gameeducation.cursos.internal;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import com.example.grupo_5_gameeducation.comum.erro.NaoEncontradoException;
 
-@ResponseStatus(HttpStatus.NOT_FOUND)
-public class AlunoNaoEncontradoException extends RuntimeException {
+/** Vira 404 {"erro": "Aluno nao encontrado: id"} pelo handler comum. */
+public class AlunoNaoEncontradoException extends NaoEncontradoException {
 
     public AlunoNaoEncontradoException(Long id) {
         super("Aluno nao encontrado: " + id);

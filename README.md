@@ -507,3 +507,214 @@ Chamada sem token: `401` no formato `{"erro"}`:
 Swagger do Core acessado pelo gateway, com o botão Authorize para o JWT:
 
 ![Swagger pelo gateway](evidencias/af/rnf03/05-swagger.png)
+
+PR #2 revisado e mergeado na `af` pelo tech lead (não pelo autor):
+
+![PR do RNF03 mergeado](evidencias/af/rnf03/06-pr-merged.png)
+
+## AF: RF01, cadastro e consulta de colaboradores e cursos
+
+Responsável: Bruno da Silveira Escanhoela. Requisito do case: *"Permitir o cadastro e a consulta de colaboradores e cursos."*
+
+### O que faz
+
+Cria duas capacidades de negócio novas no Core, cada uma como módulo próprio (`api/` + `internal/`) e com **contrato público** usado por outro módulo. É o que o feedback da AC2 pediu: modularização além de `cursos` e contratos entre módulos.
+
+- **`catalogo`**: catálogo de cursos corporativos (título, área, nível, carga horária).
+- **`colaboradores`**: cadastro dos colaboradores (cargo, área, experiência, cursos concluídos, média), com regras de acesso a dados pessoais.
+- **`cursos`** (US1, já existia) passou a usar o catálogo **pelo contrato público**: só aceita conclusão de curso que existe no catálogo.
+
+Também corrige o ponto do feedback da AC2: o contrato público dependia da entidade interna.
+
+### Módulos e contratos
+
+```mermaid
+graph LR
+    subgraph cursos
+        AC[api: AlunoController] --> CA[api: CursosApi]
+        AS[internal: AlunoService] -. implementa .-> CA
+    end
+    subgraph catalogo
+        CC[api: CursoController] --> CTA[api: CatalogoApi]
+        CS[internal: CatalogoService] -. implementa .-> CTA
+    end
+    subgraph colaboradores
+        COC[api: ColaboradorController] --> COA[api: ColaboradoresApi]
+        COS[internal: ColaboradoresService] -. implementa .-> COA
+    end
+    AS -->|buscarPorTitulo| CTA
+    COMP["competencias (RF02, Gabriel)"] -.->|buscarPerfil| COA
+    RANK["ranking (Gabriel)"] -.->|bonificar| CA
+```
+
+Na arquitetura hexagonal (seção 4 do plano), cada `*Api` é uma **porta de entrada**, o controller é o **adaptador de entrada** e a entidade/repository JPA é o **adaptador de saída**. A dependência sempre vai de `internal` para `api`, nunca o contrário, e um módulo nunca acessa o `internal` de outro.
+
+| Contrato | Métodos | Quem usa |
+|---|---|---|
+| `catalogo.api.CatalogoApi` | `buscarPorId`, `listar(area)`, `existe(titulo)`, `buscarPorTitulo`, `cadastrar` | `CursoController`, módulo `cursos` |
+| `colaboradores.api.ColaboradoresApi` | `buscarPerfil(id)` → `PerfilColaborador`, `buscar`, `listar`, `cadastrar` | `ColaboradorController`, módulo `competencias` (RF02) |
+| `cursos.api.CursosApi` | `criar`, `listar`, `buscarPorId`, `concluirCurso` (o ranking acrescenta `bonificar`) | `AlunoController`, módulo `ranking` |
+
+O `PerfilColaborador` (usado pelo RF02) traz só `id`, `nome`, `area`, `anosExperiencia`, `cursosConcluidos` e `mediaNotas`. **Não traz email**: quem só precisa do perfil não recebe dado pessoal que não vai usar.
+
+### Correção do feedback da AC2
+
+| Antes | Depois |
+|---|---|
+| `cursos/api/AlunoResponse.from(AlunoEntity)` importava `cursos.internal` | a conversão foi para `cursos/internal/AlunoMapper`. O `AlunoResponse` não conhece a entidade |
+| `cursos/api/AlunoController` importava `cursos.internal.AlunoService` | o controller depende da interface `cursos/api/CursosApi`, implementada pelo `AlunoService` |
+| `cursos` não usava nenhum outro módulo | `AlunoService.concluirCurso` valida o curso pelo `catalogo.api.CatalogoApi` |
+
+### Rotas (via gateway, `http://localhost:8080`)
+
+| Método | Rota | Quem pode | Resposta |
+|---|---|---|---|
+| POST | `/api/cursos` | ADMIN | `201 CursoResponse` / `400` / `409` título repetido |
+| GET | `/api/cursos?area=DEVOPS` | todos | `200 [CursoResponse]` / `400` área inválida |
+| GET | `/api/cursos/{id}` | todos | `200 CursoResponse` / `404` |
+| POST | `/api/colaboradores` | ADMIN | `201 ColaboradorResponse` / `400` / `409` email repetido |
+| GET | `/api/colaboradores` | ADMIN | `200 [ColaboradorResponse]` |
+| GET | `/api/colaboradores/{id}` | ADMIN ou o próprio colaborador | `200` / `403` / `404` |
+
+```json
+// CursoResponse
+{"id": 1, "titulo": "Docker na Prática", "area": "DEVOPS", "nivel": "INTERMEDIARIO", "cargaHoraria": 20}
+
+// ColaboradorResponse visto pela ana (não ADMIN): email mascarado
+{"id": 1, "nome": "Ana Souza", "email": "a***@empresa.com", "cargo": "Analista de QA",
+ "area": "QA", "anosExperiencia": 3, "cursosConcluidos": 4, "mediaNotas": 8.1}
+```
+
+Enums: `area` = `DEVOPS | QA | DESENVOLVIMENTO | DADOS | GESTAO`; `nivel` = `INICIANTE | INTERMEDIARIO | AVANCADO | ESPECIALISTA` (o mesmo usado pelo ML). Todo erro do Core sai no formato `{"erro": "mensagem"}`.
+
+### Acesso e dados pessoais (complementa o RNF03)
+
+- O Core lê a identidade dos headers que o gateway grava (`X-User-Id`, `X-User-Roles`, `X-Colaborador-Id`), montada uma única vez no `comum/identidade/Solicitante`.
+- `GET /api/colaboradores/{id}`: só ADMIN ou o próprio colaborador. A permissão é conferida **antes** de buscar, então a `ana` pedindo qualquer id que não é o dela recebe `403`, mesmo que o id não exista. Assim não dá para descobrir quais ids existem.
+- **Email mascarado** (`a***@empresa.com`) para quem não é ADMIN.
+- **Defesa em profundidade:** as rotas de ADMIN são barradas no gateway e conferidas de novo no Core.
+- **Minimização (LGPD):** nenhum CPF, telefone ou endereço é guardado, porque o negócio não precisa.
+
+### Seed
+
+Roda só com a tabela vazia, então reiniciar o container não duplica nada. Os ids dos colaboradores batem com os usuários do gateway.
+
+| Id | Colaborador | Login no gateway |
+|---|---|---|
+| 1 | Ana Souza (Analista de QA, QA) | `ana` |
+| 2 | Carlos Lima (Desenvolvedor Backend, DESENVOLVIMENTO) | `carlos` |
+| 3 | Beatriz Rocha (Engenheira DevOps, DEVOPS) | (nenhum) |
+
+Cursos do catálogo. **Os documentos do RAG (ai-service) devem usar exatamente estes títulos.** Os 3 marcados com * são os cursos dos cenários BDD da AC1, para a US1 continuar funcionando:
+
+| Título | Área | Nível | Carga |
+|---|---|---|---|
+| Docker na Prática | DEVOPS | INTERMEDIARIO | 20 h |
+| Introdução a DevOps * | DEVOPS | INICIANTE | 12 h |
+| Kubernetes para Produção | DEVOPS | AVANCADO | 40 h |
+| Fundamentos de Agile Testing * | QA | INICIANTE | 16 h |
+| Qualidade de Software * | QA | INTERMEDIARIO | 24 h |
+| Java com Spring Boot | DESENVOLVIMENTO | INTERMEDIARIO | 40 h |
+| Arquitetura de Software e Microsserviços | DESENVOLVIMENTO | ESPECIALISTA | 36 h |
+| SQL e Modelagem de Dados | DADOS | INICIANTE | 20 h |
+| Machine Learning Aplicado | DADOS | AVANCADO | 36 h |
+| Liderança de Equipes Técnicas | GESTAO | INTERMEDIARIO | 16 h |
+
+### Teste de arquitetura (ArchUnit): experimento de manutenibilidade
+
+`src/test/java/.../arquitetura/ArquiteturaTest.java` verifica 3 regras a cada `./mvnw verify`:
+
+1. **nenhum módulo acessa o `internal` de outro módulo**. A regra descobre o módulo pelo pacote, então já vale para `ranking`, `competencias` e `treinamentos` sem mudar o teste;
+2. **`..api..` não depende de `..internal..`**;
+3. **`..domain..` não importa `org.springframework..` nem `jakarta..`** (núcleo da hexagonal).
+
+É a validação experimental do ASR de **manutenibilidade** do ADR-001, pedida no feedback da AC2: se alguém quebrar uma fronteira, o build falha. Para conferir, recoloque o erro da AC2 (`AlunoResponse.from(AlunoEntity)`) e rode:
+
+```
+./mvnw test -Dtest=ArquiteturaTest
+```
+
+O resultado é `Architecture Violation ... Rule 'no classes that reside in a package '..api..' should depend on classes that reside in a package '..internal..'' was violated`, apontando o arquivo e a linha.
+
+### Decisões
+
+- **Pacote `comum/`** (não é módulo de negócio): `Solicitante` (identidade vinda do gateway), exceções base (`404`, `403`, `400`, `409`, `503`) e o `ErroHandler`, que converte qualquer erro em `{"erro": "..."}`. Os outros módulos (ranking, competencias) reaproveitam.
+- **Controllers só conhecem as interfaces `*Api`**: por isso as interfaces têm também `cadastrar`, `listar` etc., e não só os métodos que outros módulos usam.
+- **Título oficial do catálogo na US1:** a conclusão usa o título do catálogo, então "docker na prática" e "Docker na Prática" contam como o mesmo curso, e a guarda contra bonificação repetida da AC1 continua valendo.
+- **Sem porta própria para o JPA:** o `JpaRepository` já é uma interface (seção 4.3 do plano).
+
+### Testes
+
+51 testes no Core (`./mvnw clean verify`):
+
+| Classe | O que cobre |
+|---|---|
+| `ArquiteturaTest` | as 3 regras do ArchUnit |
+| `CatalogoServiceTest` | seed com 10 cursos, cadastro pelo ADMIN, listar por área, `403` para COLABORADOR, título repetido `409`, `404` |
+| `ColaboradoresServiceTest` | ids do seed (ana 1, carlos 2), perfil para o RF02, email mascarado, `403` acessando outro, `404`, listar só ADMIN, cadastro e email repetido |
+| `AlunoServiceTest` | US1 com curso do catálogo, curso fora do catálogo rejeitado, mesmo curso com outra caixa não bonifica de novo |
+| `Rf01ApiTest` | as rotas por HTTP (MockMvc) com os headers do gateway: status, JSON do contrato e `{"erro"}` |
+| `SolicitanteTest`, `MascaraEmailTest` | leitura dos headers, regra de acesso e máscara |
+| `AlunoTest` | os 3 cenários BDD da AC1, sem alteração (domínio continua com 100% no JaCoCo) |
+
+### Como testar com a aplicação rodando
+
+Subir tudo:
+
+```
+docker compose up --build
+```
+
+Login da `ana` e token guardado numa variável:
+
+```
+TOKEN=$(curl -s -X POST http://localhost:8080/auth/login -H "Content-Type: application/json" -d '{"login":"ana","senha":"ana123"}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["token"])')
+```
+
+Cursos de DevOps:
+
+```
+curl -s "http://localhost:8080/api/cursos?area=DEVOPS" -H "Authorization: Bearer $TOKEN"
+```
+
+Perfil da própria `ana` (email mascarado):
+
+```
+curl -s http://localhost:8080/api/colaboradores/1 -H "Authorization: Bearer $TOKEN"
+```
+
+`ana` no perfil do Carlos dá `403`:
+
+```
+curl -i http://localhost:8080/api/colaboradores/2 -H "Authorization: Bearer $TOKEN"
+```
+
+No navegador, em `http://localhost:5173`, a aba **Colaboradores e Cursos**:
+- logado como `ana`: catálogo, "Meu perfil" e consulta por id (o id 2 dá `403`);
+- logado como `admin`: aparecem também o cadastro de curso e de colaborador e a lista de colaboradores.
+
+### Evidências
+
+`ana` (COLABORADOR): catálogo com os 10 cursos do seed e o próprio perfil com email mascarado, sem formulários de cadastro:
+
+![ana: catálogo e perfil](evidencias/af/rf01/01-ana-colaboradores.png)
+
+`ana` consultando o colaborador 2 (Carlos): `403`:
+
+![ana recebe 403](evidencias/af/rf01/02-ana-403.png)
+
+`admin` cadastrando um curso (id 11 entra no catálogo):
+
+![admin cadastra curso](evidencias/af/rf01/03a-admin-cadastro-curso.png)
+
+`admin`: formulários de cadastro e lista de colaboradores com o email completo (ids 1 e 2 batendo com `ana` e `carlos`):
+
+![admin: cadastro e colaboradores](evidencias/af/rf01/03b-admin-colaboradores.png)
+
+ArchUnit com as 3 regras passando:
+
+![ArchUnit passando](evidencias/af/rf01/04-archunit-ok.png)
+
+ArchUnit **falhando** quando uma classe do `cursos` usa o `catalogo.internal` (experimento de manutenibilidade: o build barra a quebra de fronteira):
+
+![ArchUnit falhando](evidencias/af/rf01/05-archunit-falhando.png)
