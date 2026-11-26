@@ -43,6 +43,12 @@
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
 
+		<!-- Validacao dos requests (@NotBlank, @Email, @Min...) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
 		<!-- Health check usado pelo docker compose (o gateway so sobe com o Core saudavel) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -77,6 +83,14 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Teste de arquitetura: fronteiras entre modulos e dominio sem framework -->
+		<dependency>
+			<groupId>com.tngtech.archunit</groupId>
+			<artifactId>archunit-junit5</artifactId>
+			<version>1.5.1</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

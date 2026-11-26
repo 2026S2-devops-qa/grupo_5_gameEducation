@@ -10,6 +10,7 @@ window.ABAS.alunos = {
                 mensagem: '',
                 erro: false,
                 alunos: [],
+                titulosCatalogo: [],
                 novoAluno: { nome: '', plano: 'BASICO' },
                 conclusao: { alunoId: '', tituloCurso: '', media: null }
             };
@@ -39,8 +40,11 @@ window.ABAS.alunos = {
                             <option disabled value="">Selecione um aluno</option>
                             <option v-for="a in alunos" :key="a.id" :value="a.id">{{ a.id }} - {{ a.nome }}</option>
                         </select>
-                        <label>Título do curso</label>
-                        <input v-model="conclusao.tituloCurso" placeholder="Ex.: Fundamentos de Agile Testing" />
+                        <label>Curso do catálogo</label>
+                        <input v-model="conclusao.tituloCurso" list="titulos-catalogo" placeholder="Ex.: Fundamentos de Agile Testing" />
+                        <datalist id="titulos-catalogo">
+                            <option v-for="t in titulosCatalogo" :key="t" :value="t"></option>
+                        </datalist>
                         <label>Média (0 a 10)</label>
                         <input v-model.number="conclusao.media" type="number" step="0.1" min="0" max="10" placeholder="Ex.: 8.5" />
                         <button @click="concluirCurso">Registrar conclusão</button>
@@ -72,6 +76,15 @@ window.ABAS.alunos = {
             notificar(texto, ehErro = false) {
                 this.mensagem = texto;
                 this.erro = ehErro;
+            },
+            // O Core so aceita conclusao de curso que existe no catalogo (RF01): sugere os titulos
+            async carregarCatalogo() {
+                try {
+                    const cursos = await this.api('/api/cursos');
+                    this.titulosCatalogo = cursos.map(c => c.titulo);
+                } catch (e) {
+                    this.titulosCatalogo = [];
+                }
             },
             async listarAlunos() {
                 try {
@@ -122,6 +135,7 @@ window.ABAS.alunos = {
         },
         mounted() {
             this.listarAlunos();
+            this.carregarCatalogo();
         }
     }
 };
