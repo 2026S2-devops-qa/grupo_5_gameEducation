@@ -51,6 +51,13 @@ services:
         required: false
     environment:
       VECTORSTORE_PATH: /data/vectorstore.json
+      # RF04: acoes dos agentes em arquivo no volume (auditoria sobrevive a restart)
+      ACOES_DB_URL: jdbc:h2:file:/data/acoes
+      # RF04: o agente le colaboradores e cursos do Core (RF01) pela rede interna,
+      # repassando os headers do usuario. Padrao: Core real (RestCoreGateway).
+      # CORE_STUB=true no .env usa dados fixos (StubCoreGateway), so para desenvolvimento.
+      CORE_URL: http://app:8081
+      CORE_STUB: ${CORE_STUB:-false}
     volumes:
       - aidata:/data
     healthcheck:
