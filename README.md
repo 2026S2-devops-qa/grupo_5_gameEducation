@@ -581,6 +581,9 @@ Em `ai-service/src/main/resources/docs/`, escritos pelo grupo: `politica-de-tril
 - **Ingestão na subida**: se o arquivo já existe, só carrega (não paga embedding de novo). Se não, lê os `.md`, quebra com `TokenTextSplitter`, gera os embeddings e salva. Uma falha na ingestão não derruba o serviço: fica no log e a rota responde `503`.
 - **Sem chave, nada quebra** (seção 5.6 do plano): o serviço sobe, o health fica `UP`, a ingestão é pulada e a rota responde `503 {"erro":"LLM não configurado: defina OPENAI_API_KEY no .env"}`.
 - **LLM configurado só pelo `.env`**: `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_CHAT_MODEL`, `OPENAI_EMBEDDING_MODEL`. O Spring AI 2.0 usa o SDK oficial da OpenAI, que espera `/v1` na URL. Para o `.env.example` continuar igual, o adaptador acrescenta `/v1` quando a URL não tem caminho (`https://api.openai.com` e Ollama ganham `/v1`; a URL do Gemini, que já tem caminho, fica como está).
+- **Embeddings por adaptador próprio** (`OpenAiCompativelEmbeddingModel`): o `OpenAiEmbeddingModel` do Spring AI 2.0 exige os campos `usage` e `index` na resposta, e o endpoint compatível do Gemini não manda nenhum dos dois. O adaptador chama `{base}/embeddings` direto e lê só os vetores, então OpenAI, Gemini e Ollama funcionam pelo mesmo `.env`. O chat continua com o `ChatClient` do Spring AI. É a hexagonal na prática: trocou-se um adaptador, o núcleo não mudou.
+- **Similaridade mínima depende do modelo de embedding** (`RAG_SIMILARIDADE_MINIMA`, opcional no `.env`, padrão `0.6`). Medido com `gemini-embedding-001`: perguntas do assunto ficam em ~0,70 e fora do assunto (ex: "receita de bolo") em ~0,52. Com `text-embedding-3-small` da OpenAI os valores são menores, então use `0.3`.
+- **Falha rápida no LLM**: no máximo 1 nova tentativa e timeout de 30 s no chat. Se o provedor estiver sobrecarregado, a rota responde `503` em vez de ficar minutos esperando.
 - **Identidade pelos headers do gateway**: o ai-service não valida JWT e não publica porta. `X-User-Id` é obrigatório (senão `401`).
 - **Sem porta no host**: no compose, o `ai-service` não tem `ports`. Só o gateway chega nele (RNF03).
 
@@ -600,6 +603,20 @@ cd ai-service && ./mvnw clean verify
 | `AiServiceApplicationTests`    | **sem chave** o contexto sobe, health `UP` e a rota responde `503` com a mensagem clara                                 |
 | `DocumentosInstitucionaisTest` | 4 a 6 documentos, e os 10 títulos do seed do catálogo aparecem iguais                                                   |
 | `OpenAiBaseUrlTest`            | os três exemplos de `OPENAI_BASE_URL` do `.env.example` (OpenAI, Gemini, Ollama)                                        |
+| `OpenAiCompativelEmbeddingModelTest` | embeddings com servidor HTTP simulado: resposta da OpenAI (com `index`) e do Gemini (sem `index` e sem `usage`) |
+
+### Provedor usado nos testes do grupo (Gemini, gratuito)
+
+O `.env` que usamos para gravar o vídeo aponta para o Gemini pelo endpoint compatível com a OpenAI, sem mudar código:
+
+```
+OPENAI_API_KEY=<chave do Google AI Studio>
+OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+OPENAI_CHAT_MODEL=gemini-3.5-flash
+OPENAI_EMBEDDING_MODEL=gemini-embedding-001
+```
+
+Ao trocar de provedor ou de modelo de embedding, apague o vector store antigo (os vetores de um modelo não servem para outro): `docker compose down ai-service && docker volume rm grupo_5_gameeducation_aidata`.
 
 ### Como testar com a aplicação rodando
 

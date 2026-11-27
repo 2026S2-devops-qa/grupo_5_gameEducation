@@ -59,9 +59,9 @@ public class RecomendacaoService {
         }
 
         List<Trecho> trechos = baseConhecimento.buscar(objetivo, TOP_K);
-        log.info("RAG: usuario={} colaborador={} recuperou {} trecho(s) de {}",
+        log.info("RAG: usuario={} colaborador={} recuperou {} trecho(s): {}",
                 solicitante.login(), solicitante.colaboradorId(), trechos.size(),
-                trechos.stream().map(Trecho::fonte).distinct().toList());
+                trechos.stream().map(t -> t.fonte() + String.format(" (%.2f)", t.score())).toList());
 
         if (trechos.isEmpty()) {
             // Sem base nos documentos: nem chama o LLM (nao gasta chamada e nao inventa curso)
