@@ -18,4 +18,12 @@ public interface ModeloLinguagem {
      * @throws com.example.aiservice.application.IaIndisponivelException se o LLM falhar
      */
     RespostaGerada gerar(String instrucoesSistema, String mensagemUsuario);
+
+    /**
+     * Conversa com tool calling (RF04): o modelo pode chamar as tools recebidas quantas vezes precisar
+     * e devolve o texto final. O nucleo nao conhece o tipo das tools (vem da FabricaDeFerramentas).
+     *
+     * @throws com.example.aiservice.application.IaIndisponivelException se o LLM falhar
+     */
+    String orientar(String instrucoesSistema, String mensagemUsuario, Object ferramentas);
 }

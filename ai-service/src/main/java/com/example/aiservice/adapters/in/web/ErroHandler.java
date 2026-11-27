@@ -1,6 +1,10 @@
 package com.example.aiservice.adapters.in.web;
 
+import com.example.aiservice.application.CoreIndisponivelException;
 import com.example.aiservice.application.IaIndisponivelException;
+import com.example.aiservice.application.NaoEncontradaException;
+import com.example.aiservice.domain.AcaoJaDecididaException;
+import com.example.aiservice.domain.AcessoNegadoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -21,6 +25,26 @@ class ErroHandler {
 
     @ExceptionHandler(IaIndisponivelException.class)
     ResponseEntity<ErroResponse> iaIndisponivel(IaIndisponivelException e) {
+        return erro(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
+    }
+
+    @ExceptionHandler(AcessoNegadoException.class)
+    ResponseEntity<ErroResponse> acessoNegado(AcessoNegadoException e) {
+        return erro(HttpStatus.FORBIDDEN, e.getMessage());
+    }
+
+    @ExceptionHandler(NaoEncontradaException.class)
+    ResponseEntity<ErroResponse> naoEncontrada(NaoEncontradaException e) {
+        return erro(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler(AcaoJaDecididaException.class)
+    ResponseEntity<ErroResponse> jaDecidida(AcaoJaDecididaException e) {
+        return erro(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(CoreIndisponivelException.class)
+    ResponseEntity<ErroResponse> coreIndisponivel(CoreIndisponivelException e) {
         return erro(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
     }
 

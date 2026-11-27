@@ -47,4 +47,21 @@ class SpringAiModeloLinguagem implements ModeloLinguagem {
             throw new IaIndisponivelException(IaIndisponivelException.FALHA_LLM, e);
         }
     }
+
+    @Override
+    public String orientar(String instrucoesSistema, String mensagemUsuario, Object ferramentas) {
+        try {
+            // .tools(...): o Spring AI le os metodos @Tool e executa as chamadas que o modelo pedir
+            String texto = chatClient.prompt()
+                    .system(instrucoesSistema)
+                    .user(mensagemUsuario)
+                    .tools(ferramentas)
+                    .call()
+                    .content();
+            return texto == null || texto.isBlank() ? "Plano montado. Veja as ações propostas abaixo." : texto;
+        } catch (RuntimeException e) {
+            log.error("Falha ao chamar o LLM (agente): {}", e.getMessage());
+            throw new IaIndisponivelException(IaIndisponivelException.FALHA_LLM, e);
+        }
+    }
 }
