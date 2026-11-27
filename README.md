@@ -507,3 +507,137 @@ Chamada sem token: `401` no formato `{"erro"}`:
 Swagger do Core acessado pelo gateway, com o botão Authorize para o JWT:
 
 ![Swagger pelo gateway](evidencias/af/rnf03/05-swagger.png)
+
+## AF: RF03, recomendação de cursos com RAG (Spring AI)
+
+Responsável: João Guilherme Volta Kinol. Requisito do case: *"Recomendar cursos utilizando informações recuperadas de documentos institucionais por RAG."*
+
+### O que faz
+
+O colaborador descreve um objetivo ("quero crescer em DevOps") e o `ai-service` recomenda cursos **com base nos documentos institucionais**, citando as fontes. É RAG (Retrieval-Augmented Generation):
+
+1. **Recuperar**: busca semântica dos 4 trechos mais parecidos com o objetivo, no vector store;
+2. **Aumentar**: coloca os trechos no prompt, com a regra "use só o que está nos trechos";
+3. **Gerar**: o LLM devolve a resposta estruturada (`resposta` + `cursos`).
+
+Isso reduz a alucinação: o modelo responde com o que a empresa escreveu, não com o que "acha". Além do prompt, o domínio aplica duas travas que não dependem do LLM:
+
+- curso que **não aparece nos trechos recuperados é descartado** (`Recomendacao.fundamentada`);
+- as `fontes` vêm dos metadados dos trechos (nome real do arquivo), **nunca do texto do LLM**.
+
+Se nenhum trecho passa da similaridade mínima (pergunta fora do assunto), a resposta é *"Não encontrei nos documentos institucionais..."* **sem chamar o LLM**.
+
+```mermaid
+sequenceDiagram
+    actor U as Colaborador
+    participant GW as Gateway :8080
+    participant AI as ai-service :8082 (interno)
+    participant VS as SimpleVectorStore (/data)
+    participant LLM as API de LLM (OpenAI)
+    U->>GW: POST /api/ia/recomendacoes {objetivo} + JWT
+    GW->>AI: + X-User-Id, X-User-Roles, X-Colaborador-Id
+    AI->>VS: top-4 trechos (embedding do objetivo)
+    AI->>LLM: system (regras) + trechos + objetivo
+    LLM-->>AI: {resposta, cursos[]}
+    AI->>AI: descarta curso fora dos trechos, fontes = arquivos dos trechos
+    AI-->>U: 200 {resposta, cursos[], fontes[]}
+```
+
+Por que é um serviço separado (RNF04): o RAG evolui (modelo, prompt, documentos) e cai sem afetar o cadastro e a consulta do Core. Sem chave de LLM, só as rotas de IA ficam indisponíveis.
+
+### Versões
+
+Gerado pelo [start.spring.io](https://start.spring.io): **Spring Boot 4.1.3 + Spring AI 2.0.3**, Java 17 (mesma linha de Boot do gateway). Dependências: Spring Web, OpenAI (Spring AI), `spring-ai-vector-store` (SimpleVectorStore), Actuator, Validation, JPA + H2 (para as ações do RF04) e springdoc.
+
+### Rota (via gateway, contrato da seção 5.4 do plano)
+
+| Método | Rota                    | Corpo                                    | Resposta                                                                                                              |
+| ------ | ----------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/ia/recomendacoes` | `{"objetivo":"quero crescer em DevOps"}` | `200 {"resposta":"...","cursos":[{"titulo":"Docker na Prática","motivo":"..."}],"fontes":["politica-de-trilhas.md"]}` |
+
+Erros no formato `{"erro": "..."}`: `400` objetivo vazio, `401` sem `X-User-Id` (não veio pelo gateway), `503` sem chave de LLM, base não pronta ou LLM fora do ar.
+
+### Arquitetura hexagonal no ai-service
+
+```
+ai-service/src/main/java/com/example/aiservice/
+  domain/                    Recomendacao (regra contra alucinação), Trecho, CursoRecomendado, Solicitante. Sem Spring
+  application/               RecomendacaoService (caso de uso)
+  application/port/          BaseConhecimento, ModeloLinguagem (portas de saída)
+  adapters/in/web/           RecomendacaoController, ErroHandler, headers de identidade
+  adapters/out/vectorstore/  VectorStoreBaseConhecimento, IngestaoDocumentos (SimpleVectorStore)
+  adapters/out/llm/          SpringAiModeloLinguagem (ChatClient), normalização do OPENAI_BASE_URL
+```
+
+O `RecomendacaoService` só conhece as portas `BaseConhecimento` e `ModeloLinguagem`. Trocar de vector store (pgvector) ou de provedor de LLM (Gemini, Ollama) muda só o adaptador ou o `.env`, não o núcleo.
+
+### Documentos institucionais
+
+Em `ai-service/src/main/resources/docs/`, escritos pelo grupo: `politica-de-trilhas.md`, `matriz-de-competencias.md`, `politica-de-desenvolvimento.md`, `catalogo-cursos.md` e `faq-rh.md`. Os títulos de curso são **exatamente os do seed do catálogo** do Core (RF01), e o `DocumentosInstitucionaisTest` falha se algum título divergir.
+
+### Decisões
+
+- **SimpleVectorStore em arquivo** (`/data/vectorstore.json`, volume `aidata`), e não pgvector: são 5 documentos, e não subir mais um banco é coerente com o RNF05. Trade-off: não escala para milhares de documentos (aí troca-se o adaptador).
+- **Ingestão na subida**: se o arquivo já existe, só carrega (não paga embedding de novo). Se não, lê os `.md`, quebra com `TokenTextSplitter`, gera os embeddings e salva. Uma falha na ingestão não derruba o serviço: fica no log e a rota responde `503`.
+- **Sem chave, nada quebra** (seção 5.6 do plano): o serviço sobe, o health fica `UP`, a ingestão é pulada e a rota responde `503 {"erro":"LLM não configurado: defina OPENAI_API_KEY no .env"}`.
+- **LLM configurado só pelo `.env`**: `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_CHAT_MODEL`, `OPENAI_EMBEDDING_MODEL`. O Spring AI 2.0 usa o SDK oficial da OpenAI, que espera `/v1` na URL. Para o `.env.example` continuar igual, o adaptador acrescenta `/v1` quando a URL não tem caminho (`https://api.openai.com` e Ollama ganham `/v1`; a URL do Gemini, que já tem caminho, fica como está).
+- **Embeddings por adaptador próprio** (`OpenAiCompativelEmbeddingModel`): o `OpenAiEmbeddingModel` do Spring AI 2.0 exige os campos `usage` e `index` na resposta, e o endpoint compatível do Gemini não manda nenhum dos dois. O adaptador chama `{base}/embeddings` direto e lê só os vetores, então OpenAI, Gemini e Ollama funcionam pelo mesmo `.env`. O chat continua com o `ChatClient` do Spring AI. É a hexagonal na prática: trocou-se um adaptador, o núcleo não mudou.
+- **Similaridade mínima depende do modelo de embedding** (`RAG_SIMILARIDADE_MINIMA`, opcional no `.env`, padrão `0.6`). Medido com `gemini-embedding-001`: perguntas do assunto ficam em ~0,70 e fora do assunto (ex: "receita de bolo") em ~0,52. Com `text-embedding-3-small` da OpenAI os valores são menores, então use `0.3`.
+- **Falha rápida no LLM**: no máximo 1 nova tentativa e timeout de 30 s no chat. Se o provedor estiver sobrecarregado, a rota responde `503` em vez de ficar minutos esperando.
+- **Identidade pelos headers do gateway**: o ai-service não valida JWT e não publica porta. `X-User-Id` é obrigatório (senão `401`).
+- **Sem porta no host**: no compose, o `ai-service` não tem `ports`. Só o gateway chega nele (RNF03).
+
+### Testes
+
+Rodam sem chamar o LLM de verdade (as portas são mockadas), então o `mvn verify` não gasta chamada paga:
+
+```
+cd ai-service && ./mvnw clean verify
+```
+
+| Teste                          | O que garante                                                                                                           |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `RecomendacaoServiceTest`      | portas mockadas: recomendação com fontes, curso inventado descartado, fora do assunto sem chamar o LLM, `503` sem chave |
+| `RecomendacaoTest` (domínio)   | regra contra alucinação: curso fora dos trechos sai, fontes sem repetir, sem trechos dá "não encontrei"                 |
+| `RecomendacaoControllerTest`   | contrato REST: formato da resposta, headers repassados, `401`, `400` e `503`                                            |
+| `AiServiceApplicationTests`    | **sem chave** o contexto sobe, health `UP` e a rota responde `503` com a mensagem clara                                 |
+| `DocumentosInstitucionaisTest` | 4 a 6 documentos, e os 10 títulos do seed do catálogo aparecem iguais                                                   |
+| `OpenAiBaseUrlTest`            | os três exemplos de `OPENAI_BASE_URL` do `.env.example` (OpenAI, Gemini, Ollama)                                        |
+| `OpenAiCompativelEmbeddingModelTest` | embeddings com servidor HTTP simulado: resposta da OpenAI (com `index`) e do Gemini (sem `index` e sem `usage`) |
+
+### Provedor usado nos testes do grupo (Gemini, gratuito)
+
+O `.env` que usamos para gravar o vídeo aponta para o Gemini pelo endpoint compatível com a OpenAI, sem mudar código:
+
+```
+OPENAI_API_KEY=<chave do Google AI Studio>
+OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+OPENAI_CHAT_MODEL=gemini-3.5-flash
+OPENAI_EMBEDDING_MODEL=gemini-embedding-001
+```
+
+Ao trocar de provedor ou de modelo de embedding, apague o vector store antigo (os vetores de um modelo não servem para outro): `docker compose down ai-service && docker volume rm grupo_5_gameeducation_aidata`.
+
+### Como testar com a aplicação rodando
+
+1. (Opcional) Criar o `.env` e preencher a `OPENAI_API_KEY`. Sem ele, a rota responde `503`.
+   ```
+   cp .env.example .env
+   ```
+2. Subir tudo.
+   ```
+   docker compose up --build
+   ```
+3. Login como `ana` e guardar o token.
+   ```
+   TOKEN=$(curl -s -X POST http://localhost:8080/auth/login -H 'Content-Type: application/json' -d '{"login":"ana","senha":"ana123"}' | sed 's/.*"token":"\([^"]*\)".*/\1/')
+   ```
+4. Pedir a recomendação pelo gateway.
+   ```
+   curl -s -X POST http://localhost:8080/api/ia/recomendacoes -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"objetivo":"quero crescer em DevOps"}'
+   ```
+5. No front (`http://localhost:5173`), aba **Assistente IA**: objetivo, resposta, cursos e fontes.
+6. Ver no log que a ingestão gerou os embeddings na primeira subida e só carregou o arquivo nas seguintes.
+   ```
+   docker compose logs ai-service | grep RAG
+   ```
